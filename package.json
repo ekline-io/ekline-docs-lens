@@ -1,0 +1,45 @@
+{
+  "name": "ekline-docs-lens",
+  "version": "0.1.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ekline-io/ekline-docs-lens.git"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:browser": "vitest run --config vitest.browser.config.ts",
+    "playwright:install": "playwright install chromium"
+  },
+  "dependencies": {
+    "@sparticuz/chromium-min": "^147.0.2",
+    "cheerio": "^1.2.0",
+    "fast-xml-parser": "^5.7.2",
+    "js-tiktoken": "^1.0.21",
+    "next": "16.2.4",
+    "playwright": "^1.59.1",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "turndown": "^7.2.4",
+    "undici": "^8.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/turndown": "^5.0.6",
+    "@vitest/coverage-v8": "^4.1.5",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.4",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^4.1.5"
+  }
+}
