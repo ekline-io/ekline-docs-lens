@@ -1,4 +1,8 @@
-import { subscribe, unsubscribe } from "@/lib/core/run-store";
+import {
+  getRunWithRehydrate,
+  subscribe,
+  unsubscribe,
+} from "@/lib/core/run-store";
 import type { RunEvent } from "@/lib/core/run-types";
 
 export const runtime = "nodejs";
@@ -18,6 +22,9 @@ export async function GET(
 ) {
   const { id } = await params;
   const encoder = new TextEncoder();
+  // Load curated examples (example_*) and disk-persisted runs into the
+  // in-memory map so subscribe() can find them. A no-op for live runs.
+  await getRunWithRehydrate(id);
 
   const stream = new ReadableStream({
     start(controller) {

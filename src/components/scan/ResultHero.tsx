@@ -1,4 +1,5 @@
 import type { ProfileId } from "@/lib/core/types";
+import { bandFor, BAND_CLASSES, type Band } from "@/lib/band";
 
 type Status = "good" | "partial" | "broken";
 
@@ -20,15 +21,19 @@ interface Props {
   failCount: number;
   warnCount: number;
   pagesScanned: number;
+  discoverySource?: string;
+  capped?: boolean;
 }
 
+
 /**
- * Single hero block for the scan summary. Combines the one-sentence verdict
- * and the audit stats into one section instead of stacking them as two
- * near-redundant blocks.
+ * Result hero. Three jobs:
+ *   1. Name what each reader profile saw (verdict sentence — the headline).
+ *   2. State what to do (status band — the action).
+ *   3. Carry the shareable handle (grade pill — small, tucked into the eyebrow).
  *
- * Top: VERDICT eyebrow + sentence + executive paragraph.
- * Bottom: 4 stat tiles (AUDIT SURFACE / APPLICABLE / ISSUES / GRADE).
+ * Score math used to live in the executive paragraph. We moved it because the
+ * grade is a shareability handle, not the headline — see /methodology.
  */
 export function ResultHero({
   perProfile,
@@ -36,67 +41,94 @@ export function ResultHero({
   rootUrl,
   score,
   grade,
-  totalChecks,
   applicableChecks,
-  inapplicableChecks,
   failCount,
   warnCount,
   pagesScanned,
+  discoverySource,
+  capped,
 }: Props) {
   const sentence = buildSentence(perProfile);
-  const passing = Math.max(0, applicableChecks - failCount - warnCount);
-  const passingPct = applicableChecks > 0 ? Math.round((passing / applicableChecks) * 100) : 100;
   const issues = failCount + warnCount;
-  const verdictTail =
+  const band = bandFor(failCount, warnCount);
+  const contextLine =
     issues === 0
-      ? "is broadly accessible to AI agents with no obvious blockers."
-      : issues <= 2
-        ? "is broadly accessible to AI agents with a small number of fixable gaps."
-        : issues <= 5
-          ? `has ${issues} areas that should be addressed before agents get a clean read.`
-          : `has ${issues} areas that materially hurt agent retrieval. Worth fixing in order of severity.`;
+      ? `Across ${pagesScanned} sampled page${pagesScanned === 1 ? "" : "s"}, no agent-blocking issues turned up.`
+      : `Across ${pagesScanned} sampled page${pagesScanned === 1 ? "" : "s"}, ${issues} ${issues === 1 ? "area needs" : "areas need"} attention. The agent-fix prompt below handles ${issues === 1 ? "it" : "them"} in one pass.`;
 
   return (
     <section className="px-6 py-10 border-b border-rule bg-gradient-to-br from-paper-tint/40 via-paper to-paper">
       <div className="max-w-[1100px] mx-auto">
-        <div className="inline-flex items-center gap-2 mb-4">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent" />
-          <span className="text-[10.5px] uppercase tracking-[0.12em] text-ink/50 mono">
-            VERDICT · {rootUrl}
-          </span>
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
+          <div className="inline-flex items-center gap-2">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent" />
+            <span className="text-[10.5px] uppercase tracking-[0.12em] text-ink/50 mono">
+              VERDICT · {rootUrl}
+            </span>
+          </div>
+          <GradePill grade={grade} score={score} />
         </div>
         <h2 className="h-display h-navy text-[26px] md:text-[36px] leading-[1.1] max-w-3xl mb-5">
           {sentence}
         </h2>
         <p className="text-[15px] md:text-[16px] text-ink/75 leading-[1.7] max-w-3xl mb-8">
-          <strong className="text-ink">{siteName}</strong> scores{" "}
-          <strong className="text-ink">{score}/100 (Grade {grade})</strong>, passing{" "}
-          <strong className="text-ink">
-            {passing} of {applicableChecks} applicable checks ({passingPct}%)
-          </strong>{" "}
-          across{" "}
-          <strong className="text-ink">
-            {pagesScanned} sampled page{pagesScanned === 1 ? "" : "s"}
-          </strong>
-          . The documentation {verdictTail}
+          {siteName ? <strong className="text-ink">{siteName}</strong> : null}
+          {siteName ? " — " : null}
+          {contextLine}
         </p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
-          <StatTile label="AUDIT SURFACE" value={`${totalChecks}`} sub="checks in rubric" />
-          <StatTile
-            label="APPLICABLE"
-            value={`${applicableChecks}`}
-            sub={`${inapplicableChecks} not applicable`}
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-3xl">
+          <StatusTile band={band} />
           <StatTile
             label="ISSUES"
             value={`${issues}`}
-            sub={`${failCount} fail · ${warnCount} warn`}
+            sub={
+              issues === 0
+                ? `0 of ${applicableChecks} applicable`
+                : `${failCount} fail · ${warnCount} warn`
+            }
             tone={issues > 0 ? "alert" : "ok"}
           />
-          <StatTile label="GRADE" value={grade} sub={`${score} / 100`} tone="grade" />
+          <StatTile
+            label="PAGES"
+            value={`${pagesScanned}`}
+            sub={
+              discoverySource
+                ? `via ${discoverySource}${capped ? " · capped" : ""}`
+                : "sampled"
+            }
+          />
         </div>
       </div>
     </section>
+  );
+}
+
+function GradePill({ grade, score }: { grade: string; score: number }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border border-rule bg-white px-2.5 py-1 text-[10.5px] mono text-ink/60"
+      title={`Shareability handle — see /methodology for how this is computed`}
+    >
+      <span className="text-ink/45">grade</span>
+      <span className="font-bold text-ink">{grade}</span>
+      <span className="text-ink/30">·</span>
+      <span className="tabular-nums">{score}/100</span>
+    </span>
+  );
+}
+
+function StatusTile({ band }: { band: Band }) {
+  const classes = BAND_CLASSES[band.tone];
+  return (
+    <div className={`border rounded-lg p-3 ${classes.tile}`}>
+      <div className="text-[10px] uppercase tracking-[0.12em] text-ink/45 mono mb-1">
+        STATUS
+      </div>
+      <div className={`text-[18px] md:text-[22px] font-bold leading-tight ${classes.valueText}`}>
+        {band.label}
+      </div>
+      <div className="text-[11px] text-ink/55 mt-1.5">based on issue count and severity</div>
+    </div>
   );
 }
 
@@ -109,16 +141,14 @@ function StatTile({
   label: string;
   value: string;
   sub: string;
-  tone?: "neutral" | "ok" | "alert" | "grade";
+  tone?: "neutral" | "ok" | "alert";
 }) {
   const valueClass =
     tone === "alert"
       ? "text-[color:var(--color-fail-ring)]"
       : tone === "ok"
         ? "text-emerald-700"
-        : tone === "grade"
-          ? "h-navy"
-          : "text-ink";
+        : "text-ink";
   return (
     <div className="border border-rule rounded-lg p-3 bg-white">
       <div className="text-[10px] uppercase tracking-[0.12em] text-ink/45 mono mb-1">
