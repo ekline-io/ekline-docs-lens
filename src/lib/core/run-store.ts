@@ -1,7 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { Runner } from "./runner";
-import type { RunConfig, RunEvent, RunResult } from "./run-types";
+import type { RunConfig, RunEvent, RunResult, SiteStats } from "./run-types";
+import type { ProfileId } from "./types";
 
 /**
  * In-memory run store with on-disk persistence for completed runs.
@@ -40,6 +41,7 @@ interface PersistedRun {
 }
 
 const RUNS_DIR = path.join(process.cwd(), ".docs-lens", "runs");
+const EXAMPLES_DIR = path.join(process.cwd(), "public", "examples");
 const runs = new Map<string, RunRecord>();
 
 export function startRun(config: RunConfig): { id: string } {
@@ -94,14 +96,17 @@ export async function getRunWithRehydrate(
 ): Promise<RunRecord | undefined> {
   const inMem = runs.get(id);
   if (inMem) return inMem;
-  const persisted = await loadPersisted(id);
+  const persisted = id.startsWith("example_")
+    ? await loadExample(id)
+    : await loadPersisted(id);
   if (!persisted) return undefined;
-  // Rehydrate as a finished record. No event log on disk, so SSE replay
-  // for re-loaded runs is empty — the snapshot endpoint is the way in.
+  // We synthesize an event log because the disk format doesn't preserve
+  // one — without it, an SSE subscriber to a rehydrated run sits forever
+  // in `status: "loading"`.
   const record: RunRecord = {
     id: persisted.id,
     status: persisted.status,
-    events: [],
+    events: synthesizeEventsFromResult(persisted),
     result: persisted.result,
     errorMessage: persisted.errorMessage,
     stopRequested: false,
@@ -109,6 +114,81 @@ export async function getRunWithRehydrate(
   };
   runs.set(id, record);
   return record;
+}
+
+function synthesizeEventsFromResult(p: PersistedRun): RunEvent[] {
+  const events: RunEvent[] = [];
+  const result = p.result;
+  if (!result) {
+    if (p.status === "error") {
+      events.push({
+        type: "run:error",
+        message: p.errorMessage ?? "scan failed",
+      });
+    }
+    return events;
+  }
+  const pages = result.pages ?? [];
+  const pageUrls = pages.map((pp) => pp.url);
+  events.push({
+    type: "discover",
+    pages: pageUrls,
+    source: result.siteStats?.source ?? "bfs",
+    capped: result.siteStats?.capped ?? false,
+  });
+  for (let i = 0; i < pages.length; i++) {
+    const page = pages[i]!;
+    events.push({ type: "page:start", url: page.url, index: i });
+    for (const [pid, prof] of Object.entries(page.profiles)) {
+      events.push({
+        type: "profile:done",
+        url: page.url,
+        profile: pid as ProfileId,
+        ok: prof.ok,
+        chars: prof.chars ?? 0,
+        tokensClaude: prof.tokensClaude ?? 0,
+        durationMs: prof.durationMs ?? 0,
+      });
+    }
+    events.push({
+      type: "page:done",
+      url: page.url,
+      index: i,
+      diff: page.diff ?? {
+        largestProfile: "headless",
+        charsFraction: { rawHttp: 0, headless: 0, snippet: 0 },
+        jsGatedFraction: 0,
+      },
+    });
+  }
+  const siteStats: SiteStats = result.siteStats ?? {
+    pagesScanned: pages.length,
+    source: "bfs",
+    capped: false,
+    avgJsGatedFraction: 0,
+    avgTokensClaudePerProfile: { rawHttp: 0, headless: 0, snippet: 0 },
+    fixBacklog: 0,
+  };
+  if (p.status === "stopped") {
+    events.push({
+      type: "run:stopped",
+      siteStats,
+      fixes: result.fixes ?? [],
+      reason: p.errorMessage ?? "stopped",
+    });
+  } else if (p.status === "done") {
+    events.push({
+      type: "run:done",
+      siteStats,
+      fixes: result.fixes ?? [],
+    });
+  } else if (p.status === "error") {
+    events.push({
+      type: "run:error",
+      message: p.errorMessage ?? "scan failed",
+    });
+  }
+  return events;
 }
 
 export function subscribe(
@@ -179,6 +259,35 @@ async function loadPersisted(id: string): Promise<PersistedRun | null> {
   try {
     const raw = await fs.readFile(path.join(RUNS_DIR, `${id}.json`), "utf8");
     return JSON.parse(raw) as PersistedRun;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Load a curated example scan. Example IDs look like `example_<slug>`; the
+ * underlying JSON lives at `public/examples/<slug>.json` (with `-` instead
+ * of `_` in the slug since URL-safe filenames). These files are checked in
+ * and ship with the deploy, so they survive function recycles without
+ * needing the on-disk run cache.
+ */
+// Parsed example JSON cache, keyed by slug. Bounded (one entry per file in
+// public/examples/), avoids re-parsing a ~1 MB JSON on every cold lambda hit.
+const exampleCache = new Map<string, PersistedRun>();
+
+async function loadExample(id: string): Promise<PersistedRun | null> {
+  if (!/^example_[a-z0-9_]+$/.test(id)) return null;
+  const slug = id.slice("example_".length).replace(/_/g, "-");
+  const cached = exampleCache.get(slug);
+  if (cached) return cached;
+  try {
+    const raw = await fs.readFile(
+      path.join(EXAMPLES_DIR, `${slug}.json`),
+      "utf8",
+    );
+    const parsed = JSON.parse(raw) as PersistedRun;
+    exampleCache.set(slug, parsed);
+    return parsed;
   } catch {
     return null;
   }

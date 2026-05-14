@@ -1,4 +1,5 @@
 import type { ProfileId } from "@/lib/core/types";
+import { formatTokens } from "@/lib/format";
 
 type Status = "good" | "partial" | "broken" | "skipped";
 
@@ -10,6 +11,8 @@ interface Props {
   totalChecks?: number;
   /** Optional explanatory copy per profile (e.g. for "skipped"). */
   skipReasons?: Partial<Record<ProfileId, string>>;
+  /** Average Claude-tokens this reader extracted, used to ground broken/partial copy. */
+  tokensPerProfile?: Record<ProfileId, number>;
 }
 
 const LABELS: Record<ProfileId, { title: string; consumers: string; tagline: string }> = {
@@ -63,7 +66,9 @@ export function ProfileStatusCards({
   generalCount = 0,
   totalChecks = 30,
   skipReasons,
+  tokensPerProfile,
 }: Props) {
+  const headlessTokens = tokensPerProfile?.headless ?? 0;
   return (
     <section className="px-6 py-8 border-b border-rule">
       <div className="max-w-[1100px] mx-auto">
@@ -80,11 +85,26 @@ export function ProfileStatusCards({
               totalChecks > 0 ? Math.max(0, Math.min(1, 1 - count / totalChecks)) : 1;
             const cleanPct = Math.round(cleanFraction * 100);
             const isSkipped = status === "skipped";
+            const isBroken = status === "broken";
+            const isPartial = status === "partial";
             const skipReason = skipReasons?.[id];
+            const thisTokens = tokensPerProfile?.[id] ?? 0;
+            // For partial readers, "cleanliness" alone is misleading — what
+            // matters is how much of the page they actually saw vs the
+            // headless baseline. Show retrieval %, not finding %.
+            const retrievalPct =
+              isPartial && headlessTokens > 0
+                ? Math.max(0, Math.min(100, Math.round((thisTokens / headlessTokens) * 100)))
+                : null;
+            const borderTone = isBroken
+              ? "ring-1 ring-rose-200"
+              : isPartial
+                ? "ring-1 ring-amber-200"
+                : "";
             return (
               <div
                 key={id}
-                className="card relative overflow-hidden p-5 hover:shadow-card-lift transition-shadow"
+                className={`card relative overflow-hidden p-5 hover:shadow-card-lift transition-shadow ${borderTone}`}
               >
                 <div className="flex items-center gap-2 mb-1">
                   <span className={`w-2 h-2 rounded-full ${STATUS[status].dot}`} />
@@ -99,18 +119,45 @@ export function ProfileStatusCards({
                 </div>
                 <p className="text-[11px] text-ink/55 mono mb-1">{LABELS[id].tagline}</p>
                 <p className="text-[11.5px] text-ink/65 mb-4">{LABELS[id].consumers}</p>
-                {isSkipped ? (
+                {isSkipped || isBroken ? (
                   <div className="space-y-1.5">
                     <div className="flex justify-between items-baseline">
                       <span className="text-[10.5px] uppercase tracking-[0.08em] text-ink/45 mono">
-                        Cleanliness
+                        {isBroken ? "Retrieved" : "Cleanliness"}
                       </span>
-                      <span className="text-[12.5px] font-bold text-ink/40 mono">—</span>
+                      <span
+                        className={`text-[12.5px] font-bold mono ${
+                          isBroken ? "text-rose-700" : "text-ink/40"
+                        }`}
+                      >
+                        {isBroken ? "0%" : "—"}
+                      </span>
                     </div>
                     <div className="h-1.5 bg-paper-dim rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-ink/15 bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(0,0,0,0.08)_4px,rgba(0,0,0,0.08)_8px)]"
+                        className={
+                          isBroken
+                            ? "h-full bg-rose-300 bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(190,18,60,0.25)_4px,rgba(190,18,60,0.25)_8px)]"
+                            : "h-full bg-ink/15 bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(0,0,0,0.08)_4px,rgba(0,0,0,0.08)_8px)]"
+                        }
                         style={{ width: "100%" }}
+                      />
+                    </div>
+                  </div>
+                ) : isPartial && retrievalPct !== null ? (
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-[10.5px] uppercase tracking-[0.08em] text-ink/45 mono">
+                        Retrieved
+                      </span>
+                      <span className="text-[12.5px] font-bold text-amber-700 mono">
+                        {retrievalPct}%
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-paper-dim rounded-full overflow-hidden">
+                      <div
+                        className={`h-full ${STATUS[status].bar} transition-all duration-500`}
+                        style={{ width: `${retrievalPct}%` }}
                       />
                     </div>
                   </div>
@@ -131,17 +178,15 @@ export function ProfileStatusCards({
                   </div>
                 )}
                 <p className="text-[12.5px] text-ink/75 mt-4">
-                  {isSkipped
-                    ? skipReason ?? "Skipped on this host."
-                    : count === 0
-                      ? generalCount > 0
-                        ? `No reader-specific findings. ${generalCount} site-wide ${generalCount === 1 ? "issue affects" : "issues affect"} every reader.`
-                        : "No findings affect this reader."
-                      : `${count} reader-specific ${count === 1 ? "finding" : "findings"}.${
-                          generalCount > 0
-                            ? ` ${generalCount} site-wide ${generalCount === 1 ? "issue affects" : "issues affect"} every reader too.`
-                            : ""
-                        }`}
+                  {bodyTextFor({
+                    status,
+                    skipReason,
+                    count,
+                    generalCount,
+                    thisTokens,
+                    headlessTokens,
+                    retrievalPct,
+                  })}
                 </p>
               </div>
             );
@@ -150,4 +195,34 @@ export function ProfileStatusCards({
       </div>
     </section>
   );
+}
+
+function bodyTextFor(args: {
+  status: Status;
+  skipReason?: string;
+  count: number;
+  generalCount: number;
+  thisTokens: number;
+  headlessTokens: number;
+  retrievalPct: number | null;
+}): string {
+  const { status, skipReason, count, generalCount, thisTokens, headlessTokens, retrievalPct } = args;
+  if (status === "skipped") return skipReason ?? "Skipped on this host.";
+  if (status === "broken") {
+    return headlessTokens > 0
+      ? `Returned no usable content. Other readers extracted up to ${formatTokens(headlessTokens)} tokens per page; this one sees an empty page.`
+      : "Returned no usable content for this site.";
+  }
+  if (status === "partial" && retrievalPct !== null) {
+    return `Sees ${retrievalPct}% of what the headless browser sees (${formatTokens(thisTokens)} of ${formatTokens(headlessTokens)} tokens per page).`;
+  }
+  if (count === 0) {
+    if (generalCount === 0) return "Reads the page cleanly.";
+    const verb = generalCount === 1 ? "issue affects" : "issues affect";
+    return `Reads the page cleanly. ${generalCount} site-wide ${verb} every reader, including this one.`;
+  }
+  const findingsPart = `${count} reader-specific ${count === 1 ? "finding" : "findings"}.`;
+  if (generalCount === 0) return findingsPart;
+  const verb = generalCount === 1 ? "issue affects" : "issues affect";
+  return `${findingsPart} ${generalCount} site-wide ${verb} every reader too.`;
 }

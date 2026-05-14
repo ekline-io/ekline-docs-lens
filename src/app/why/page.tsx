@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SiteHeader } from "@/components/SiteHeader";
 
 interface Citation {
   text: string;
@@ -68,28 +69,7 @@ const VS: Array<{ tool: string; angle: string; we: string }> = [
 export default function WhyPage() {
   return (
     <div className="min-h-screen flex flex-col bg-paper">
-      <header className="bg-paper-dim/50 border-b border-rule">
-        <div className="max-w-[1200px] mx-auto px-6 py-3 flex items-center gap-4 flex-wrap">
-          <Link href="/" className="flex items-center gap-2.5 shrink-0">
-            <span className="inline-block w-2 h-2 rounded-sm bg-accent" />
-            <span className="text-[15px] font-bold tracking-tight h-navy">Docs Lens</span>
-            <span className="hidden lg:inline text-[11.5px] text-ink/50 ml-1 mono">
-              v0.2 · educational
-            </span>
-          </Link>
-          <span className="hidden md:inline text-[12px] text-ink/55">
-            The case for this tool.
-          </span>
-          <div className="flex items-center gap-2 ml-auto shrink-0">
-            <Link href="/methodology" className="btn-subtle">
-              Methodology
-            </Link>
-            <Link href="/" className="btn-accent">
-              Run a scan →
-            </Link>
-          </div>
-        </div>
-      </header>
+      <SiteHeader />
 
       <main className="flex-1 flex flex-col">
         {/* Hero */}
@@ -241,12 +221,12 @@ export default function WhyPage() {
               See what your docs look like to the second audience.
             </h2>
             <p className="text-[14px] text-ink/65 mb-6 max-w-xl mx-auto">
-              Free, no signup. Pick a docs URL, watch three agent populations read it, get a
-              prompt to fix what&apos;s broken.
+              Pick a docs URL, watch three agent populations read it, get a prompt to fix
+              what&apos;s broken.
             </p>
             <div className="flex items-center justify-center gap-3 flex-wrap">
               <Link href="/" className="btn-accent">
-                Run a scan →
+                Paste a URL →
               </Link>
               <Link href="/methodology" className="btn-subtle">
                 Read the methodology

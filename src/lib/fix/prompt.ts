@@ -88,7 +88,7 @@ function dedupeById(findings: FixFinding[]): FixFinding[] {
 }
 
 /** Strip the "check:" / "diff:" / "site:" prefix some sources prepend to ids. */
-function bareId(id: string): string {
+export function bareId(id: string): string {
   const colon = id.indexOf(":");
   if (colon === -1) return id;
   return id.slice(colon + 1);
