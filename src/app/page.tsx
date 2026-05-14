@@ -122,12 +122,6 @@ export default function Page() {
             <DotGrid />
           </div>
           <div className="max-w-[1100px] mx-auto">
-            <div className="inline-flex items-center gap-2 mb-6 chip">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-              <span className="mono text-[10.5px] uppercase tracking-[0.12em]">
-                three readers · zero LLMs in scoring
-              </span>
-            </div>
             <h1 className="h-display h-navy text-[44px] md:text-[68px] leading-[1] mb-6 max-w-4xl">
               See what every agent gets{" "}
               <span className="accent-underline">when it reads your docs.</span>
