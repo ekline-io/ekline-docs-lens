@@ -367,7 +367,7 @@ export default function MethodologyPage() {
             </div>
             <div>
               <Link href="/" className="btn-accent">
-                Scan your docs →
+                Paste a URL →
               </Link>
             </div>
           </div>

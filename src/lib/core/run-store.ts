@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { Runner } from "./runner";
-import type { RunConfig, RunEvent, RunResult } from "./run-types";
+import type { RunConfig, RunEvent, RunResult, SiteStats } from "./run-types";
 import type { ProfileId } from "./types";
 
 /**
@@ -161,17 +161,25 @@ function synthesizeEventsFromResult(p: PersistedRun): RunEvent[] {
       },
     });
   }
+  const siteStats: SiteStats = result.siteStats ?? {
+    pagesScanned: pages.length,
+    source: "bfs",
+    capped: false,
+    avgJsGatedFraction: 0,
+    avgTokensClaudePerProfile: { rawHttp: 0, headless: 0, snippet: 0 },
+    fixBacklog: 0,
+  };
   if (p.status === "stopped") {
     events.push({
       type: "run:stopped",
-      siteStats: result.siteStats!,
+      siteStats,
       fixes: result.fixes ?? [],
       reason: p.errorMessage ?? "stopped",
     });
   } else if (p.status === "done") {
     events.push({
       type: "run:done",
-      siteStats: result.siteStats!,
+      siteStats,
       fixes: result.fixes ?? [],
     });
   } else if (p.status === "error") {

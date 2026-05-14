@@ -226,7 +226,7 @@ export default function WhyPage() {
             </p>
             <div className="flex items-center justify-center gap-3 flex-wrap">
               <Link href="/" className="btn-accent">
-                Run a scan →
+                Paste a URL →
               </Link>
               <Link href="/methodology" className="btn-subtle">
                 Read the methodology

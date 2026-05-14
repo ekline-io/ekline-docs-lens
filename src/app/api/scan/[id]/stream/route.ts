@@ -22,9 +22,8 @@ export async function GET(
 ) {
   const { id } = await params;
   const encoder = new TextEncoder();
-  // Curated example IDs and runs that have been evicted from the in-memory
-  // map but persisted to disk need rehydration before subscribe() can find
-  // them. No-op if the run is already live.
+  // Load curated examples (example_*) and disk-persisted runs into the
+  // in-memory map so subscribe() can find them. A no-op for live runs.
   await getRunWithRehydrate(id);
 
   const stream = new ReadableStream({
