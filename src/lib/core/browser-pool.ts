@@ -18,6 +18,47 @@ const SPARTICUZ_TAR_URL = `https://github.com/Sparticuz/chromium/releases/downlo
 // when a launch genuinely won't recover.
 const LAUNCH_TIMEOUT_MS = 30_000;
 
+// Fire once per server process, on first module load. In dev, a Playwright
+// version bump leaves the on-disk Chromium cache out of date — every scan
+// then silently shows headless as broken with the launch error buried in
+// the API response. This probe surfaces the same failure with the fix
+// command, before a user-facing scan completes. No-op in prod and on
+// Vercel where @sparticuz/chromium-min handles the binary differently.
+//
+// `globalThis` guard survives Turbopack's HMR re-evaluation of this module
+// so the warning fires at most once per dev process.
+const PROBE_GUARD = Symbol.for("docs-lens.headlessProbe");
+type ProbeGlobal = typeof globalThis & { [PROBE_GUARD]?: true };
+if (
+  process.env.NODE_ENV !== "production" &&
+  process.env.VERCEL !== "1" &&
+  process.env.DOCS_LENS_SKIP_BROWSER_PROBE !== "1" &&
+  !(globalThis as ProbeGlobal)[PROBE_GUARD]
+) {
+  (globalThis as ProbeGlobal)[PROBE_GUARD] = true;
+  void probeHeadlessChromium();
+}
+
+async function probeHeadlessChromium(): Promise<void> {
+  try {
+    const browser = await chromium.launch({ headless: true });
+    await browser.close();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const firstLine =
+      msg.split("\n").map((l) => l.trim()).find((l) => l.length > 0) ?? msg;
+    const yellow = "\x1b[33m";
+    const reset = "\x1b[0m";
+    const bold = "\x1b[1m";
+    console.warn(
+      `\n${yellow}${bold}[docs-lens] Headless reader is not available.${reset}\n` +
+        `${yellow}  Chromium launch failed: ${firstLine}${reset}\n` +
+        `${yellow}  Scans will complete, but the "Headless browser" profile will return no content.${reset}\n` +
+        `${yellow}  Fix: ${bold}npm run playwright:install${reset}${yellow} (or set DOCS_LENS_SKIP_BROWSER_PROBE=1)${reset}\n`,
+    );
+  }
+}
+
 export interface BrowserPoolOptions {
   maxContexts: number;
   userAgent?: string;

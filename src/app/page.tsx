@@ -3,7 +3,8 @@
 import { useCallback, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { HomepageDemo } from "@/components/HomepageDemo";
+import { HomepageExamples } from "@/components/HomepageExamples";
+import { SiteHeader } from "@/components/SiteHeader";
 import type { RunResult } from "@/lib/core/run-types";
 import { SNAPSHOT_KEY_PREFIX, clearOldSnapshots, encodeSnapshot } from "@/lib/snapshot-codec";
 
@@ -111,25 +112,7 @@ export default function Page() {
 
   return (
     <div className="min-h-screen flex flex-col bg-paper">
-      <section className="bg-paper-dim/50 border-b border-rule">
-        <div className="max-w-[1200px] mx-auto px-6 py-3 flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2.5">
-            <span className="inline-block w-2 h-2 rounded-sm bg-accent" />
-            <span className="text-[15px] font-bold tracking-tight h-navy">Docs Lens</span>
-            <span className="hidden lg:inline text-[11.5px] text-ink/50 ml-1 mono">
-              v0.2 · educational
-            </span>
-          </div>
-          <div className="flex items-center gap-2 ml-auto shrink-0">
-            <Link href="/why" className="btn-subtle hidden md:inline-flex">
-              Why this exists
-            </Link>
-            <Link href="/methodology" className="btn-subtle hidden sm:inline-flex">
-              Methodology
-            </Link>
-          </div>
-        </div>
-      </section>
+      <SiteHeader />
 
       <main className="flex-1 flex flex-col">
         {/* Hero */}
@@ -155,7 +138,7 @@ export default function Page() {
               named product. Paste a docs URL and we&apos;ll show you the gap, explain
               why it matters, and hand you a prompt to fix it.
             </p>
-            <form onSubmit={submit} className="flex flex-col sm:flex-row gap-2 max-w-2xl">
+            <form onSubmit={submit} className="flex flex-col sm:flex-row sm:items-center gap-2 max-w-2xl">
               <input
                 type="text"
                 inputMode="url"
@@ -164,16 +147,13 @@ export default function Page() {
                 onChange={(e) => setUrl(e.target.value)}
                 className="flex-1 input-base"
                 disabled={submitting}
+                aria-label="documentation URL"
               />
-              <input
-                type="number"
-                min={1}
-                max={MAX_CAP}
+              <PagesStepper
                 value={cap}
-                onChange={(e) => setCap(Number(e.target.value))}
-                className="w-20 input-base"
+                onChange={setCap}
                 disabled={submitting}
-                aria-label="page cap"
+                max={MAX_CAP}
               />
               <button type="submit" className="btn-accent" disabled={submitting}>
                 {submitting ? (SYNC_SCAN ? "Scanning…" : "Starting…") : "Scan →"}
@@ -187,39 +167,26 @@ export default function Page() {
                 {`Scanning ${cap} ${cap === 1 ? "page" : "pages"}. Typically takes ${estimatedSeconds(cap)} on the hosted demo, since Chromium launches once per page for a clean network stack. Please don’t refresh.`}
               </p>
             )}
-            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11.5px] text-ink/50">
-              <span>Try:</span>
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <span className="text-[11.5px] uppercase tracking-[0.12em] text-ink/45 mono mr-1">
+                Try one of these
+              </span>
               {EXAMPLE_URLS.map((ex) => (
                 <button
                   key={ex.url}
                   type="button"
                   onClick={() => setUrl(ex.url)}
-                  className="text-ink/65 hover:text-accent transition-colors mono underline-offset-2 hover:underline"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-rule bg-white px-3 py-1.5 text-[12.5px] text-ink/80 hover:border-accent hover:text-accent hover:bg-paper-dim transition-colors"
                 >
+                  <span aria-hidden className="text-ink/35">↳</span>
                   {ex.label}
                 </button>
               ))}
-              <span className="ml-auto">
-                {DEFAULT_CAP} pages default · max {MAX_CAP} · free, no signup
-              </span>
             </div>
           </div>
         </section>
 
-        {/* Demo block */}
-        <section className="px-6 pb-20">
-          <div className="max-w-[1100px] mx-auto">
-            <div className="flex items-baseline gap-3 mb-4 flex-wrap">
-              <span className="text-[11px] uppercase tracking-[0.12em] text-ink/50 mono">
-                LIVE PREVIEW · sample page
-              </span>
-              <span className="text-[12.5px] text-ink/55">
-                Same content, three very different reads.
-              </span>
-            </div>
-            <HomepageDemo />
-          </div>
-        </section>
+        <HomepageExamples />
       </main>
 
       <footer className="border-t border-rule py-8 px-6">
@@ -243,6 +210,59 @@ export default function Page() {
           </div>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function PagesStepper({
+  value,
+  onChange,
+  disabled,
+  max,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  disabled: boolean;
+  max: number;
+}) {
+  const clamp = (n: number) => Math.max(1, Math.min(max, Math.round(n)));
+  const bump = (delta: number) => onChange(clamp(value + delta));
+  return (
+    <div
+      className={`inline-flex items-center gap-1 rounded-full border border-rule bg-white pl-3 pr-1 py-1 ${
+        disabled ? "opacity-50 pointer-events-none" : ""
+      }`}
+    >
+      <span className="text-[12px] text-ink/55 mono">Pages</span>
+      <button
+        type="button"
+        onClick={() => bump(-1)}
+        aria-label="decrease page count"
+        disabled={disabled || value <= 1}
+        className="w-6 h-6 inline-flex items-center justify-center rounded-full text-ink/70 hover:bg-paper-dim hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      >
+        −
+      </button>
+      <input
+        type="number"
+        min={1}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(clamp(Number(e.target.value) || 1))}
+        disabled={disabled}
+        aria-label="page count"
+        className="w-9 text-center text-[14px] font-semibold tabular-nums bg-transparent focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+      />
+      <button
+        type="button"
+        onClick={() => bump(1)}
+        aria-label="increase page count"
+        disabled={disabled || value >= max}
+        className="w-6 h-6 inline-flex items-center justify-center rounded-full text-ink/70 hover:bg-paper-dim hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      >
+        +
+      </button>
+      <span className="text-[11px] text-ink/40 mono mr-2">/ {max} max</span>
     </div>
   );
 }

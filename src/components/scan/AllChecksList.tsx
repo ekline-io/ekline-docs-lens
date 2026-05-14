@@ -3,6 +3,13 @@
 import { useMemo, useState } from "react";
 import type { AuditEntry, CheckResult, Severity } from "@/lib/types";
 import { axisOf, type Axis } from "@/lib/types";
+import { fixCopyFor } from "@/lib/fix/check-fix-copy";
+
+/** Strip a `<prefix>:` from a check id (matches src/lib/fix/prompt.ts:bareId). */
+function bareId(id: string): string {
+  const colon = id.indexOf(":");
+  return colon === -1 ? id : id.slice(colon + 1);
+}
 
 interface Props {
   checks: CheckResult[];
@@ -315,10 +322,53 @@ function CheckRow({ check }: { check: CheckResult }) {
         )}
       </button>
       {expanded && hasAudit && (
-        <div className="px-4 pb-4">
+        <div className="px-4 pb-4 space-y-3">
+          <FixGuidance check={check} />
           <AuditTrail audit={check.audit ?? []} />
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Per-check "what / why / how" panel rendered inside an expanded row. Pulls
+ * from `fixCopyFor` so this UI shares its copy with the agent-fix prompt
+ * (one source of truth in src/lib/fix/check-fix-copy.ts). When no copy is
+ * registered for a check id, this component renders nothing — the audit
+ * trail still does the heavy lifting.
+ */
+function FixGuidance({ check }: { check: CheckResult }) {
+  const id = bareId(check.id);
+  const copy = fixCopyFor(id);
+  if (!copy) return null;
+  const showFix = check.severity === "fail" || check.severity === "warn";
+  return (
+    <div className="space-y-2.5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="rounded-lg border border-rule bg-paper-tint/30 p-3.5">
+          <div className="text-[10px] uppercase tracking-[0.12em] text-ink/45 mono mb-1.5">
+            Why it matters
+          </div>
+          <p className="text-[12.5px] text-ink/80 leading-relaxed">{copy.long}</p>
+        </div>
+        {showFix && (
+          <div className="rounded-lg border border-rule bg-paper-tint/30 p-3.5">
+            <div className="text-[10px] uppercase tracking-[0.12em] text-ink/45 mono mb-1.5">
+              How to fix
+            </div>
+            <p className="text-[12.5px] text-ink/80 leading-relaxed">{copy.short}</p>
+          </div>
+        )}
+      </div>
+      <a
+        href={`/methodology#${id}`}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-1 text-[11.5px] text-ink/60 hover:text-accent transition-colors mono"
+      >
+        View in methodology <span aria-hidden>↗</span>
+      </a>
     </div>
   );
 }

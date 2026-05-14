@@ -5,7 +5,8 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useScanRun } from "@/hooks/useScanRun";
 import { ScanProgress } from "@/components/scan/ScanProgress";
-import { ScanHeader } from "@/components/scan/ScanHeader";
+import { SiteHeader } from "@/components/SiteHeader";
+import { ScanRunBar } from "@/components/scan/ScanRunBar";
 import { deriveStatuses } from "@/lib/profile-status";
 import { ResultHero } from "@/components/scan/ResultHero";
 import { ProfileStatusCards } from "@/components/scan/ProfileStatusCards";
@@ -13,6 +14,7 @@ import { AgentFixPrompt } from "@/components/scan/AgentFixPrompt";
 import { AllChecksList } from "@/components/scan/AllChecksList";
 import { PageMatrix } from "@/components/scan/PageMatrix";
 import { LivePreview } from "@/components/scan/LivePreview";
+import { ScanLiveFeed } from "@/components/scan/ScanLiveFeed";
 import { AccuracyDisclaimer } from "@/components/AccuracyDisclaimer";
 import { generateAgentFixPrompt } from "@/lib/fix/prompt";
 import { allFixCopyKeys } from "@/lib/fix/check-fix-copy";
@@ -144,13 +146,15 @@ export default function ScanPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-paper">
-      <ScanHeader state={state} />
+      <SiteHeader />
       <ScanProgress state={state} runId={id} />
       <main className="flex-1 flex flex-col">
+        <ScanRunBar state={state} />
         {/* Persistent hero: shows the user's site through three agent readers,
             both during and after the scan. Stays visible as the page scrolls
             so the visual hook never disappears. */}
         <LivePreview runId={id} state={state} />
+        <ScanLiveFeed state={state} />
         {ready && (
           <>
             <ResultHero
@@ -165,6 +169,8 @@ export default function ScanPage() {
               failCount={failCount}
               warnCount={warnCount}
               pagesScanned={state.pages.length}
+              discoverySource={state.discover?.source ?? state.siteStats?.source}
+              capped={state.discover?.capped ?? state.siteStats?.capped}
             />
             <ProfileStatusCards
               perProfile={perProfileWithSkips}
@@ -172,6 +178,7 @@ export default function ScanPage() {
               generalCount={generalCount}
               totalChecks={TOTAL_CHECKS}
               skipReasons={skipReasons}
+              tokensPerProfile={state.siteStats?.avgTokensClaudePerProfile}
             />
             {/* Action before details: the agent-fix prompt is the actionable
                 output, give it pride of place above the deep audit list. */}

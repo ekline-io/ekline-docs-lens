@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { SiteHeader } from "@/components/SiteHeader";
+import { allFixCopyEntries, type FixCopy } from "@/lib/fix/check-fix-copy";
+import { axisOf, type Axis } from "@/lib/types";
 
 interface Consumer {
   name: string;
@@ -184,30 +187,7 @@ export default function MethodologyPage() {
   return (
     <div className="min-h-screen flex flex-col bg-paper">
       {/* Top nav matches homepage + scan page */}
-      <header className="bg-paper-dim/50 border-b border-rule">
-        <div className="max-w-[1200px] mx-auto px-6 py-3 flex items-center gap-4 flex-wrap">
-          <Link href="/" className="flex items-center gap-2.5 shrink-0">
-            <span className="inline-block w-2 h-2 rounded-sm bg-accent" />
-            <span className="text-[15px] font-bold tracking-tight h-navy">
-              Docs Lens
-            </span>
-            <span className="hidden lg:inline text-[11.5px] text-ink/50 ml-1 mono">
-              v0.2 · educational
-            </span>
-          </Link>
-          <span className="hidden md:inline text-[12px] text-ink/55">
-            How we read your docs.
-          </span>
-          <div className="flex items-center gap-2 ml-auto shrink-0">
-            <Link href="/why" className="btn-subtle hidden md:inline-flex">
-              Why this exists
-            </Link>
-            <Link href="/" className="btn-accent">
-              Run a scan →
-            </Link>
-          </div>
-        </div>
-      </header>
+      <SiteHeader />
 
       <main className="flex-1 flex flex-col">
         {/* Hero */}
@@ -368,11 +348,15 @@ export default function MethodologyPage() {
           </div>
         </section>
 
+        {/* Per-check rubric — one section per check, with anchored ids so scan
+            results can deep-link here from each FAIL/WARN row. */}
+        <CheckRubric />
+
         {/* Open source / CTA */}
         <section className="px-6 py-14 border-t border-rule bg-gradient-to-br from-paper to-paper-tint/40">
           <div className="max-w-[1100px] mx-auto text-center">
             <span className="text-[10.5px] uppercase tracking-[0.12em] text-ink/45 mono mb-3 inline-block">
-              SECTION 05 · OPEN SOURCE
+              SECTION 06 · OPEN SOURCE
             </span>
             <h2 className="h-display text-[28px] md:text-[34px] h-navy mb-4 max-w-2xl mx-auto leading-tight">
               The whole scoring path is open. Re-run any number we show you.
@@ -412,5 +396,130 @@ export default function MethodologyPage() {
         </div>
       </footer>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------------ */
+/* Per-check rubric. One section per check, with anchored ids so the scan   */
+/* results page can deep-link from each FAIL/WARN row. The data is pulled  */
+/* from `src/lib/fix/check-fix-copy.ts` — same source the agent-fix prompt */
+/* and the in-row "Why it matters / How to fix" panels read from. Adding a  */
+/* new check there propagates here automatically.                          */
+/* ------------------------------------------------------------------------ */
+
+const AXIS_META: Record<
+  Axis,
+  { title: string; subtitle: string; toneBadge: string }
+> = {
+  agent: {
+    title: "Agent retrieval",
+    subtitle:
+      "Whether coding agents (Claude Code, Cursor, Continue) can read this site.",
+    toneBadge: "bg-emerald-50 text-emerald-800 border-emerald-200",
+  },
+  geo: {
+    title: "Generative engine",
+    subtitle:
+      "Whether answer engines (ChatGPT Search, Perplexity, You.com) surface this site.",
+    toneBadge: "bg-sky-50 text-sky-800 border-sky-200",
+  },
+  context: {
+    title: "Context management",
+    subtitle:
+      "Whether this site fits efficiently into an agent's context window per page.",
+    toneBadge: "bg-amber-50 text-amber-800 border-amber-200",
+  },
+};
+
+const AXIS_ORDER: Axis[] = ["agent", "geo", "context"];
+
+function CheckRubric() {
+  const groups: Record<Axis, Array<{ id: string; copy: FixCopy }>> = {
+    agent: [],
+    geo: [],
+    context: [],
+  };
+  for (const entry of allFixCopyEntries()) {
+    groups[axisOf(entry.id)].push(entry);
+  }
+  for (const axis of AXIS_ORDER) {
+    groups[axis].sort((a, b) => a.copy.title.localeCompare(b.copy.title));
+  }
+  return (
+    <section className="px-6 py-14 border-t border-rule">
+      <div className="max-w-[1100px] mx-auto">
+        <div className="flex items-baseline gap-3 mb-2">
+          <span className="text-[10.5px] uppercase tracking-[0.12em] text-ink/45 mono">
+            SECTION 05
+          </span>
+        </div>
+        <h2 className="h-display text-[26px] h-navy mb-2">
+          Every check, in detail
+        </h2>
+        <p className="text-[14px] text-ink/70 max-w-3xl mb-8 leading-relaxed">
+          One entry per check. Each scan-result FAIL/WARN row links here so
+          you can ground the verdict in its rubric definition. Anchor URLs
+          are stable — bookmark, share, or link from your own docs review.
+        </p>
+
+        <div className="space-y-12">
+          {AXIS_ORDER.map((axis) => {
+            const meta = AXIS_META[axis];
+            const items = groups[axis];
+            if (items.length === 0) return null;
+            return (
+              <div key={axis}>
+                <div className="mb-4 flex items-baseline gap-3 flex-wrap">
+                  <h3 className="text-[18px] font-bold text-ink h-navy">
+                    {meta.title}
+                  </h3>
+                  <span
+                    className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10.5px] mono font-semibold ${meta.toneBadge}`}
+                  >
+                    {items.length} {items.length === 1 ? "check" : "checks"}
+                  </span>
+                </div>
+                <p className="text-[13px] text-ink/65 mb-5 max-w-2xl leading-relaxed">
+                  {meta.subtitle}
+                </p>
+                <div className="grid grid-cols-1 gap-3">
+                  {items.map(({ id, copy }) => (
+                    <article
+                      key={id}
+                      id={id}
+                      className="rounded-lg border border-rule bg-white p-4 scroll-mt-24 target:bg-paper-tint/40 target:border-accent target:ring-1 target:ring-accent/40 transition-colors"
+                    >
+                      <div className="flex items-baseline justify-between gap-3 mb-1.5 flex-wrap">
+                        <h4 className="text-[15px] font-semibold text-ink leading-tight">
+                          {copy.title}
+                        </h4>
+                        <a
+                          href={`#${id}`}
+                          className="mono text-[10.5px] text-ink/40 hover:text-accent transition-colors"
+                          aria-label={`Anchor link for ${id}`}
+                        >
+                          #{id}
+                        </a>
+                      </div>
+                      <p className="text-[12.5px] text-ink/70 leading-relaxed mb-3">
+                        {copy.long}
+                      </p>
+                      <div className="rounded-md border border-rule bg-paper-dim/50 p-3">
+                        <div className="text-[10px] uppercase tracking-[0.12em] text-ink/45 mono mb-1">
+                          Typical fix
+                        </div>
+                        <p className="text-[12.5px] text-ink/85 leading-relaxed">
+                          {copy.short}
+                        </p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
   );
 }

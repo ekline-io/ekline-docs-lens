@@ -48,3 +48,10 @@ next-env.d.ts
 .dev-pid
 .dev-watchdog-pid
 dev.log
+
+# Local review / Playwright debug artifacts (per-session screenshots, etc.)
+/review-*.png
+/.playwright-mcp/
+/homepage-*.png
+/page-drilldown.png
+/scan-*.png

@@ -9,43 +9,36 @@ interface Props {
 }
 
 /**
- * Persistent header on /scan/[id]. Shows the scanned root URL, page count,
- * source (sitemap vs BFS), and elapsed time. The user shouldn't have to
- * scroll up or look at the URL bar to remember what they're looking at.
+ * Run-context bar shown inside the scan page body. Carries the scanned root
+ * URL, page count, source, and elapsed time — info that's specific to the
+ * current run rather than to the site itself, so it belongs near the result
+ * rather than in the global header.
  */
-export function ScanHeader({ state }: Props) {
+export function ScanRunBar({ state }: Props) {
   const root = state.result?.config.rootUrl;
   const pageCount = state.totalPages;
   const source = state.discover?.source ?? state.siteStats?.source;
   const capped = state.discover?.capped ?? state.siteStats?.capped;
   const startedAt = state.result?.startedAt;
   const finishedAt = state.result?.finishedAt;
-  // Only show elapsed time once the run has finished — `Date.now()` during
-  // render would force re-renders for every tick (and trips React's
-  // `react-hooks/purity` rule). The progress bar carries live status.
-  const elapsedMs =
-    startedAt && finishedAt ? finishedAt - startedAt : null;
+  const elapsedMs = startedAt && finishedAt ? finishedAt - startedAt : null;
 
   return (
-    <section className="bg-paper-dim/50 border-b border-rule">
-      <div className="max-w-[1200px] mx-auto px-6 py-3 flex items-center gap-4 flex-wrap">
-        <Link href="/" className="flex items-center gap-2.5 shrink-0">
-          <span className="inline-block w-2 h-2 rounded-sm bg-accent" />
-          <span className="text-[15px] font-bold tracking-tight h-navy">Docs Lens</span>
-        </Link>
+    <section className="px-6 pt-6 pb-2">
+      <div className="max-w-[1100px] mx-auto flex items-center gap-4 flex-wrap">
         <div className="flex items-baseline gap-2 flex-wrap min-w-0">
           {root ? (
             <a
               href={root}
               target="_blank"
               rel="noreferrer"
-              className="text-[13px] text-ink/85 font-medium hover:text-accent transition-colors truncate max-w-[480px]"
+              className="text-[14px] text-ink font-semibold hover:text-accent transition-colors truncate max-w-[520px]"
               title={root}
             >
               {prettyHost(root)}
             </a>
           ) : (
-            <span className="text-[13px] text-ink/45">scanning…</span>
+            <span className="text-[14px] text-ink/45">scanning…</span>
           )}
           <Stat label={`${pageCount || "?"} pages`} />
           {source && <Stat label={`via ${source}${capped ? " · capped" : ""}`} />}
@@ -55,12 +48,6 @@ export function ScanHeader({ state }: Props) {
           <CopyLinkButton />
           <Link href="/" className="btn-subtle">
             <PlusIcon /> New scan
-          </Link>
-          <Link
-            href="/methodology"
-            className="btn-subtle hidden sm:inline-flex"
-          >
-            Methodology
           </Link>
         </div>
       </div>
@@ -130,7 +117,7 @@ function CheckIcon() {
 
 function Stat({ label }: { label: string }) {
   return (
-    <span className="text-[12px] text-ink/55 tabular-nums">
+    <span className="text-[12.5px] text-ink/60 tabular-nums">
       <span className="text-ink/30 mx-1">·</span>
       {label}
     </span>
