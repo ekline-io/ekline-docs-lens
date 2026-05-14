@@ -1,11 +1,7 @@
 import type { ProfileId } from "@/lib/core/types";
+import { formatTokens } from "@/lib/format";
 
 type Status = "good" | "partial" | "broken" | "skipped";
-
-function formatTokens(n: number): string {
-  if (n >= 1000) return `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k`;
-  return `${Math.round(n)}`;
-}
 
 interface Props {
   perProfile: Record<ProfileId, Status>;
@@ -182,23 +178,15 @@ export function ProfileStatusCards({
                   </div>
                 )}
                 <p className="text-[12.5px] text-ink/75 mt-4">
-                  {isSkipped
-                    ? skipReason ?? "Skipped on this host."
-                    : isBroken
-                      ? headlessTokens > 0
-                        ? `Returned no usable content. Other readers extracted up to ${formatTokens(headlessTokens)} tokens per page; this one sees an empty page.`
-                        : "Returned no usable content for this site."
-                      : isPartial && retrievalPct !== null
-                        ? `Sees ${retrievalPct}% of what the headless browser sees (${formatTokens(thisTokens)} of ${formatTokens(headlessTokens)} tokens per page).`
-                        : count === 0
-                          ? generalCount > 0
-                            ? `Reads the page cleanly. ${generalCount} site-wide ${generalCount === 1 ? "issue affects" : "issues affect"} every reader, including this one.`
-                            : "Reads the page cleanly."
-                          : `${count} reader-specific ${count === 1 ? "finding" : "findings"}.${
-                              generalCount > 0
-                                ? ` ${generalCount} site-wide ${generalCount === 1 ? "issue affects" : "issues affect"} every reader too.`
-                                : ""
-                            }`}
+                  {bodyTextFor({
+                    status,
+                    skipReason,
+                    count,
+                    generalCount,
+                    thisTokens,
+                    headlessTokens,
+                    retrievalPct,
+                  })}
                 </p>
               </div>
             );
@@ -207,4 +195,34 @@ export function ProfileStatusCards({
       </div>
     </section>
   );
+}
+
+function bodyTextFor(args: {
+  status: Status;
+  skipReason?: string;
+  count: number;
+  generalCount: number;
+  thisTokens: number;
+  headlessTokens: number;
+  retrievalPct: number | null;
+}): string {
+  const { status, skipReason, count, generalCount, thisTokens, headlessTokens, retrievalPct } = args;
+  if (status === "skipped") return skipReason ?? "Skipped on this host.";
+  if (status === "broken") {
+    return headlessTokens > 0
+      ? `Returned no usable content. Other readers extracted up to ${formatTokens(headlessTokens)} tokens per page; this one sees an empty page.`
+      : "Returned no usable content for this site.";
+  }
+  if (status === "partial" && retrievalPct !== null) {
+    return `Sees ${retrievalPct}% of what the headless browser sees (${formatTokens(thisTokens)} of ${formatTokens(headlessTokens)} tokens per page).`;
+  }
+  if (count === 0) {
+    if (generalCount === 0) return "Reads the page cleanly.";
+    const verb = generalCount === 1 ? "issue affects" : "issues affect";
+    return `Reads the page cleanly. ${generalCount} site-wide ${verb} every reader, including this one.`;
+  }
+  const findingsPart = `${count} reader-specific ${count === 1 ? "finding" : "findings"}.`;
+  if (generalCount === 0) return findingsPart;
+  const verb = generalCount === 1 ? "issue affects" : "issues affect";
+  return `${findingsPart} ${generalCount} site-wide ${verb} every reader too.`;
 }

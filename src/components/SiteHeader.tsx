@@ -12,7 +12,7 @@ const NAV_ITEMS = [
 export function SiteHeader() {
   const pathname = usePathname();
   return (
-    <section className="bg-paper-dim/50 border-b border-rule">
+    <header className="bg-paper-dim/50 border-b border-rule">
       <div className="max-w-[1200px] mx-auto px-6 py-3 flex items-center gap-4 flex-wrap">
         <Link href="/" className="flex items-center gap-2.5 shrink-0">
           <span className="inline-block w-2 h-2 rounded-sm bg-accent" />
@@ -39,6 +39,6 @@ export function SiteHeader() {
           <GitHubLink />
         </nav>
       </div>
-    </section>
+    </header>
   );
 }

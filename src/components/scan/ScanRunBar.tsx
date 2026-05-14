@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { ScanState } from "@/hooks/useScanRun";
+import { formatDuration } from "@/lib/format";
+import { hostAndPath } from "@/lib/url-display";
 
 interface Props {
   state: ScanState;
@@ -35,7 +37,7 @@ export function ScanRunBar({ state }: Props) {
               className="text-[14px] text-ink font-semibold hover:text-accent transition-colors truncate max-w-[520px]"
               title={root}
             >
-              {prettyHost(root)}
+              {hostAndPath(root)}
             </a>
           ) : (
             <span className="text-[14px] text-ink/45">scanning…</span>
@@ -124,21 +126,3 @@ function Stat({ label }: { label: string }) {
   );
 }
 
-function prettyHost(url: string): string {
-  try {
-    const u = new URL(url);
-    const path = u.pathname === "/" ? "" : u.pathname;
-    return u.host + path;
-  } catch {
-    return url;
-  }
-}
-
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms} ms`;
-  const s = Math.round(ms / 100) / 10;
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  const rem = Math.round(s - m * 60);
-  return `${m}m ${rem}s`;
-}

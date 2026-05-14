@@ -3,29 +3,24 @@
 import { useMemo } from "react";
 import type { ScanState, PageProgress } from "@/hooks/useScanRun";
 import type { ProfileId } from "@/lib/core/types";
+import { formatChars } from "@/lib/format";
+import { pathOf } from "@/lib/url-display";
 
 interface Props {
   state: ScanState;
 }
 
 const MAX_VISIBLE = 8;
+type Tone = "good" | "partial" | "broken" | "neutral";
 
 /**
  * Live feed of every page as it streams through the three reader profiles.
- * The wait between "click Scan" and "result hero appears" used to be a blank
- * counter; this turns it into a teaching moment — each page becomes a mini
- * object lesson in how the three readers diverge.
- *
- * Only renders while the scan is in flight. Once `status` flips to a
- * terminal state, the parent unmounts us and the post-scan blocks
- * (ProfileStatusCards, PageMatrix, etc.) take over.
+ * Turns the multi-minute scan wait into a teaching moment — each row shows
+ * three numbers, so the reader watches the homepage promise come true.
  */
 export function ScanLiveFeed({ state }: Props) {
   const visible = useMemo(() => orderForFeed(state.pages), [state.pages]);
   if (state.status !== "running" || visible.length === 0) return null;
-
-  const total = state.totalPages || 0;
-  const done = state.pagesDone;
 
   return (
     <section className="px-6 py-6 border-b border-rule bg-paper-tint/20">
@@ -35,7 +30,7 @@ export function ScanLiveFeed({ state }: Props) {
             What we&apos;re reading
           </span>
           <span className="text-[12px] text-ink/55 mono tabular-nums">
-            pages {done} / {total}
+            pages {state.pagesDone} / {state.totalPages || 0}
           </span>
         </div>
         <ul className="space-y-1.5">
@@ -53,43 +48,51 @@ export function ScanLiveFeed({ state }: Props) {
   );
 }
 
+type PageStatus = "done" | "inFlight" | "queued";
+
+function statusOf(page: PageProgress): PageStatus {
+  if (page.done) return "done";
+  if (Object.keys(page.charsByProfile).length > 0) return "inFlight";
+  return "queued";
+}
+
 function FeedRow({ page }: { page: PageProgress }) {
-  const fetching = !page.done && Object.keys(page.charsByProfile).length === 0;
-  const inFlight = !page.done && Object.keys(page.charsByProfile).length > 0;
-  const path = pathOf(page.url);
+  const status = statusOf(page);
   return (
     <li className="flex items-center gap-3 text-[12.5px] leading-relaxed">
       <span className="w-4 shrink-0 inline-flex items-center justify-center">
-        {page.done ? (
-          <span className="text-emerald-600">✓</span>
-        ) : inFlight ? (
-          <span
-            className="inline-block w-3 h-3 rounded-full border-2 border-accent border-t-transparent animate-spin"
-            aria-label="fetching"
-          />
-        ) : fetching ? (
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-ink/30" aria-label="queued" />
-        ) : null}
+        <StatusIcon status={status} />
       </span>
       <span
         className={`truncate flex-1 min-w-0 ${
-          page.done ? "text-ink/85" : "text-ink/95"
+          status === "done" ? "text-ink/85" : "text-ink/95"
         }`}
         title={page.url}
       >
-        {path}
+        {pathOf(page.url)}
       </span>
-      <ReadingRow page={page} />
+      <ReadingRow page={page} status={status} />
     </li>
   );
 }
 
-function ReadingRow({ page }: { page: PageProgress }) {
-  if (!page.done && Object.keys(page.charsByProfile).length === 0) {
+function StatusIcon({ status }: { status: PageStatus }) {
+  if (status === "done") return <span className="text-emerald-600">✓</span>;
+  if (status === "inFlight") {
     return (
-      <span className="text-[11px] text-ink/40 mono tabular-nums shrink-0">
-        queued
-      </span>
+      <span
+        className="inline-block w-3 h-3 rounded-full border-2 border-accent border-t-transparent animate-spin"
+        aria-label="fetching"
+      />
+    );
+  }
+  return <span className="inline-block w-1.5 h-1.5 rounded-full bg-ink/30" aria-label="queued" />;
+}
+
+function ReadingRow({ page, status }: { page: PageProgress; status: PageStatus }) {
+  if (status === "queued") {
+    return (
+      <span className="text-[11px] text-ink/40 mono tabular-nums shrink-0">queued</span>
     );
   }
   const tone = toneForSpread(page.charsByProfile);
@@ -106,8 +109,6 @@ function ReadingRow({ page }: { page: PageProgress }) {
     </span>
   );
 }
-
-type Tone = "good" | "partial" | "broken" | "neutral";
 
 function ProfileChars({
   id,
@@ -127,26 +128,25 @@ function ProfileChars({
       </span>
     );
   }
-  const valueClass =
-    chars === 0
-      ? "text-rose-700"
-      : tone === "partial" && id === "rawHttp"
-        ? "text-amber-700"
-        : tone === "good"
-          ? "text-emerald-700"
-          : "text-ink/80";
   return (
     <span className="text-ink/50">
-      {label} <span className={`${valueClass} font-semibold ml-0.5`}>{formatChars(chars)}</span>
+      {label}{" "}
+      <span className={`${charClass(chars, tone, id)} font-semibold ml-0.5`}>
+        {formatChars(chars)}
+      </span>
     </span>
   );
 }
 
-/**
- * Decide the tone for a row's reader-profile numbers. We compare raw HTTP
- * vs headless because that's the canonical JS-gated-content signal —
- * snippets are intentionally tiny and don't carry signal.
- */
+function charClass(chars: number, tone: Tone, id: ProfileId): string {
+  if (chars === 0) return "text-rose-700";
+  if (tone === "partial" && id === "rawHttp") return "text-amber-700";
+  if (tone === "good") return "text-emerald-700";
+  return "text-ink/80";
+}
+
+// Snippets are intentionally tiny and don't carry signal, so we compare raw
+// HTTP vs headless for the JS-gated check.
 function toneForSpread(chars: PageProgress["charsByProfile"]): Tone {
   const r = chars.rawHttp;
   const h = chars.headless;
@@ -156,18 +156,14 @@ function toneForSpread(chars: PageProgress["charsByProfile"]): Tone {
   return "good";
 }
 
-/**
- * Order pages for the feed: in-flight first (any profile reported but not
- * all done), then completed, then untouched-queued. Within each bucket,
- * higher index = more recent in discovery order, so it bubbles up.
- */
 function orderForFeed(pages: PageProgress[]): PageProgress[] {
   const inFlight: PageProgress[] = [];
   const done: PageProgress[] = [];
   const queued: PageProgress[] = [];
   for (const p of pages) {
-    if (p.done) done.push(p);
-    else if (Object.keys(p.charsByProfile).length > 0) inFlight.push(p);
+    const s = statusOf(p);
+    if (s === "done") done.push(p);
+    else if (s === "inFlight") inFlight.push(p);
     else queued.push(p);
   }
   const byIndexDesc = (a: PageProgress, b: PageProgress) => b.index - a.index;
@@ -175,21 +171,4 @@ function orderForFeed(pages: PageProgress[]): PageProgress[] {
   done.sort(byIndexDesc);
   queued.sort(byIndexDesc);
   return [...inFlight, ...done, ...queued].slice(0, MAX_VISIBLE);
-}
-
-function pathOf(url: string): string {
-  try {
-    const u = new URL(url);
-    const p = u.pathname === "/" ? "/" : u.pathname.replace(/\/$/, "");
-    return p || "/";
-  } catch {
-    return url;
-  }
-}
-
-function formatChars(n: number): string {
-  if (n === 0) return "0";
-  if (n >= 10_000) return `${Math.round(n / 1000)}k`;
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
-  return `${n}`;
 }

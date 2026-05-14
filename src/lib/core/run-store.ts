@@ -100,11 +100,9 @@ export async function getRunWithRehydrate(
     ? await loadExample(id)
     : await loadPersisted(id);
   if (!persisted) return undefined;
-  // Rehydrate as a finished record. The event log isn't stored on disk so
-  // we synthesize the minimum sequence the client needs to transition out
-  // of `loading` and into a `done` state — without that, an SSE subscriber
-  // to a rehydrated run sits forever in `status: "loading"`. The snapshot
-  // endpoint fills in everything the live event stream would have carried.
+  // We synthesize an event log because the disk format doesn't preserve
+  // one — without it, an SSE subscriber to a rehydrated run sits forever
+  // in `status: "loading"`.
   const record: RunRecord = {
     id: persisted.id,
     status: persisted.status,
@@ -265,15 +263,23 @@ async function loadPersisted(id: string): Promise<PersistedRun | null> {
  * and ship with the deploy, so they survive function recycles without
  * needing the on-disk run cache.
  */
+// Parsed example JSON cache, keyed by slug. Bounded (one entry per file in
+// public/examples/), avoids re-parsing a ~1 MB JSON on every cold lambda hit.
+const exampleCache = new Map<string, PersistedRun>();
+
 async function loadExample(id: string): Promise<PersistedRun | null> {
   if (!/^example_[a-z0-9_]+$/.test(id)) return null;
   const slug = id.slice("example_".length).replace(/_/g, "-");
+  const cached = exampleCache.get(slug);
+  if (cached) return cached;
   try {
     const raw = await fs.readFile(
       path.join(EXAMPLES_DIR, `${slug}.json`),
       "utf8",
     );
-    return JSON.parse(raw) as PersistedRun;
+    const parsed = JSON.parse(raw) as PersistedRun;
+    exampleCache.set(slug, parsed);
+    return parsed;
   } catch {
     return null;
   }

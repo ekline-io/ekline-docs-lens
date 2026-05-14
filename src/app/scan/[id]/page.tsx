@@ -19,6 +19,7 @@ import { AccuracyDisclaimer } from "@/components/AccuracyDisclaimer";
 import { generateAgentFixPrompt } from "@/lib/fix/prompt";
 import { allFixCopyKeys } from "@/lib/fix/check-fix-copy";
 import type { ProfileId } from "@/lib/core/types";
+import { hostOf } from "@/lib/url-display";
 
 const TOTAL_CHECKS = allFixCopyKeys().length;
 
@@ -137,7 +138,7 @@ export default function ScanPage() {
     if (!ready || !rootUrl) return "";
     return generateAgentFixPrompt({
       siteUrl: rootUrl,
-      siteName: hostnameOf(rootUrl),
+      siteName: hostOf(rootUrl),
       score,
       grade,
       findings: state.fixes,
@@ -159,8 +160,8 @@ export default function ScanPage() {
           <>
             <ResultHero
               perProfile={perProfile}
-              siteName={hostnameOf(rootUrl)}
-              rootUrl={hostnameOf(rootUrl)}
+              siteName={hostOf(rootUrl)}
+              rootUrl={hostOf(rootUrl)}
               score={score}
               grade={grade}
               totalChecks={TOTAL_CHECKS}
@@ -204,10 +205,3 @@ export default function ScanPage() {
   );
 }
 
-function hostnameOf(url: string): string {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return url;
-  }
-}

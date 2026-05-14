@@ -4,12 +4,7 @@ import { useMemo, useState } from "react";
 import type { AuditEntry, CheckResult, Severity } from "@/lib/types";
 import { axisOf, type Axis } from "@/lib/types";
 import { fixCopyFor } from "@/lib/fix/check-fix-copy";
-
-/** Strip a `<prefix>:` from a check id (matches src/lib/fix/prompt.ts:bareId). */
-function bareId(id: string): string {
-  const colon = id.indexOf(":");
-  return colon === -1 ? id : id.slice(colon + 1);
-}
+import { bareId } from "@/lib/fix/prompt";
 
 interface Props {
   checks: CheckResult[];

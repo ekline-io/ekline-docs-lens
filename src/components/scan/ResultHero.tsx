@@ -1,4 +1,5 @@
 import type { ProfileId } from "@/lib/core/types";
+import { bandFor, BAND_CLASSES, type Band } from "@/lib/band";
 
 type Status = "good" | "partial" | "broken";
 
@@ -24,18 +25,6 @@ interface Props {
   capped?: boolean;
 }
 
-type Band = {
-  label: string;
-  tone: "ok" | "warn" | "alert" | "crit";
-};
-
-function bandFor(failCount: number, warnCount: number): Band {
-  const issues = failCount + warnCount;
-  if (issues === 0) return { label: "Agent-ready", tone: "ok" };
-  if (failCount === 0 && issues <= 2) return { label: "Mostly readable", tone: "warn" };
-  if (failCount <= 2 && issues <= 5) return { label: "Needs work", tone: "warn" };
-  return { label: "Broken for agents", tone: "alert" };
-}
 
 /**
  * Result hero. Three jobs:
@@ -129,24 +118,13 @@ function GradePill({ grade, score }: { grade: string; score: number }) {
 }
 
 function StatusTile({ band }: { band: Band }) {
-  const tone =
-    band.tone === "ok"
-      ? "border-emerald-200 bg-emerald-50/60"
-      : band.tone === "warn"
-        ? "border-amber-200 bg-amber-50/60"
-        : "border-rose-200 bg-rose-50/60";
-  const valueTone =
-    band.tone === "ok"
-      ? "text-emerald-800"
-      : band.tone === "warn"
-        ? "text-amber-800"
-        : "text-rose-800";
+  const classes = BAND_CLASSES[band.tone];
   return (
-    <div className={`border rounded-lg p-3 ${tone}`}>
+    <div className={`border rounded-lg p-3 ${classes.tile}`}>
       <div className="text-[10px] uppercase tracking-[0.12em] text-ink/45 mono mb-1">
         STATUS
       </div>
-      <div className={`text-[18px] md:text-[22px] font-bold leading-tight ${valueTone}`}>
+      <div className={`text-[18px] md:text-[22px] font-bold leading-tight ${classes.valueText}`}>
         {band.label}
       </div>
       <div className="text-[11px] text-ink/55 mt-1.5">based on issue count and severity</div>
