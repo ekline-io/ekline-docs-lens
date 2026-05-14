@@ -60,8 +60,8 @@ const VS: Array<{ tool: string; angle: string; we: string }> = [
   },
   {
     tool: "afdocs (npx afdocs check)",
-    angle: "Open-source CLI by the AFDocs spec authors. Comprehensive. Best for CI integration.",
-    we: "We complement it. Our agent-fix prompt explicitly points users at npx afdocs check --fixes --verbose for deeper local detail. We're the visual-first companion.",
+    angle: "Open-source CLI for the AFDocs Spec. Canonical rubric. Best for CI integration.",
+    we: "We run a superset (38 checks vs afdocs's 23, with 17 shared IDs). Our agent-fix prompt points users at the pinned `npx afdocs@0.18 check` for an independent read; the alignment audit at docs/audits/afdocs-rubric.md shows current drift.",
   },
 ];
 

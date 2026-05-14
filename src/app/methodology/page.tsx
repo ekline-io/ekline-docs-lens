@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AFDOCS_PINNED_VERSION } from "@/lib/fix/afdocs-version";
 
 interface Consumer {
   name: string;
@@ -375,11 +376,34 @@ export default function MethodologyPage() {
               SECTION 05 · OPEN SOURCE
             </span>
             <h2 className="h-display text-[28px] md:text-[34px] h-navy mb-4 max-w-2xl mx-auto leading-tight">
-              The whole scoring path is open. Re-run any number we show you.
+              Our rubric is open. Run afdocs locally for an independent read.
             </h2>
+            <p className="text-[14px] text-ink/70 max-w-2xl mx-auto leading-relaxed mb-6">
+              <a
+                href="https://afdocs.dev"
+                target="_blank"
+                rel="noreferrer"
+                className="text-accent hover:underline"
+              >
+                afdocs
+              </a>{" "}
+              is the canonical CLI for the Agent-Friendly Documentation Spec. We run a
+              superset of its rubric and add Docs Lens-specific checks (well-known
+              endpoints, OAuth discovery, sitemap, bot-rules, link integrity, structured
+              data). See our{" "}
+              <a
+                href="https://github.com/ekline-io/ekline-docs-lens/blob/main/docs/audits/afdocs-rubric.md"
+                target="_blank"
+                rel="noreferrer"
+                className="text-accent hover:underline"
+              >
+                alignment audit
+              </a>{" "}
+              for the current overlap.
+            </p>
             <div className="inline-flex items-center gap-2 px-4 py-3 rounded-lg bg-[color:var(--color-agent-bg)] text-[color:var(--color-agent-fg)] mono text-[12.5px] mb-6">
               <span className="text-[color:var(--color-agent-muted)]">$</span>
-              <span>npx afdocs check &lt;url&gt; --fixes --verbose</span>
+              <span>npx afdocs@{AFDOCS_PINNED_VERSION} check &lt;url&gt; --fixes --verbose</span>
             </div>
             <div>
               <Link href="/" className="btn-accent">
