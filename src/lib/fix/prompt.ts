@@ -77,7 +77,7 @@ export function generateAgentFixPrompt(input: AgentFixPromptInput): string {
   lines.push("- **-v, --verbose**: Shows per-page details (specific URLs, character counts, error codes)");
   lines.push("");
   lines.push(
-    "afdocs runs ~23 checks; Docs Lens runs ~38 with ~17 shared IDs. afdocs won't see findings against checks Docs Lens added (well-known endpoints, OAuth discovery, sitemap, AI bot rules, etc.).",
+    "Docs Lens calls `afdocs.runChecks()` for the 23 AFDocs Spec checks (same verdict you'd get from the CLI) and adds 16 Docs Lens-specific checks on top: well-known endpoints, OAuth discovery, sitemap, AI bot rules, image alt coverage, structured data, internal-link integrity, heading hierarchy.",
   );
 
   return lines.join("\n");

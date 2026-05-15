@@ -1,16 +1,12 @@
 import type { FixFinding } from "@/lib/fix/types";
 import type { CheckResult } from "@/lib/types";
-import { checkLlmsTxt } from "./llms-txt";
 import { checkWellKnown, checkRobotsAndSignals } from "./well-known";
-import { checkMarkdownUrl, checkContentNegotiation } from "./markdown-support";
 import { checkOAuthDiscovery, checkOAuthProtectedResource } from "./oauth";
 import { checkSitemap } from "./sitemap";
-import { checkLlmsTxtDirective, checkLinkHeaders } from "./discovery-extras";
+import { checkLinkHeaders } from "./discovery-extras";
 import { checkAiBotRules } from "./ai-bots";
-import { checkCacheHeaders } from "./cache-headers";
 import { checkWebBotAuth } from "./bot-auth";
 import { checkA2AAgentCard } from "./a2a";
-import { checkRedirectBehavior } from "./redirect-behavior";
 
 /**
  * Run the AFDocs-style site-level probes (llms.txt, /.well-known/*, robots,
@@ -28,55 +24,40 @@ export async function runSiteChecks(seedUrl: string): Promise<{
   findings: FixFinding[];
   allChecks: CheckResult[];
 }> {
+  // These are the Docs Lens-specific site-level probes. afdocs covers the
+  // AFDocs Spec checks via its own runner (see src/lib/afdocs/runner.ts);
+  // we only run what afdocs doesn't.
   const [
-    llmsTxt,
     wellKnown,
     robots,
-    mdUrl,
-    negotiation,
     oauth,
     oauthRes,
     sitemap,
-    llmsTxtDirective,
     linkHeaders,
     aiBotRules,
-    cacheHeaders,
     webBotAuth,
     a2a,
-    redirectBehavior,
   ] = await Promise.all([
-    safe(() => checkLlmsTxt(seedUrl)),
     safe(() => checkWellKnown(seedUrl)),
     safe(() => checkRobotsAndSignals(seedUrl)),
-    safe(() => checkMarkdownUrl(seedUrl)),
-    safe(() => checkContentNegotiation(seedUrl)),
     safe(() => checkOAuthDiscovery(seedUrl)),
     safe(() => checkOAuthProtectedResource(seedUrl)),
     safe(() => checkSitemap(seedUrl)),
-    safe(() => checkLlmsTxtDirective(seedUrl)),
     safe(() => checkLinkHeaders(seedUrl)),
     safe(() => checkAiBotRules(seedUrl)),
-    safe(() => checkCacheHeaders(seedUrl)),
     safe(() => checkWebBotAuth(seedUrl)),
     safe(() => checkA2AAgentCard(seedUrl)),
-    safe(() => checkRedirectBehavior(seedUrl)),
   ]);
   const all = [
-    ...llmsTxt,
     ...wellKnown,
     ...robots,
-    ...mdUrl,
-    ...negotiation,
     ...oauth,
     ...oauthRes,
     ...sitemap,
-    ...llmsTxtDirective,
     ...linkHeaders,
     ...aiBotRules,
-    ...cacheHeaders,
     ...webBotAuth,
     ...a2a,
-    ...redirectBehavior,
   ].filter((c): c is CheckResult => Boolean(c));
   const findings = all
     .filter((c) => c.severity !== "pass" && c.severity !== "info")
