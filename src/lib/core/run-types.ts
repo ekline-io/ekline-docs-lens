@@ -79,4 +79,5 @@ export type RunEvent =
   | { type: "page:done"; url: string; index: number; diff: PageDiff }
   | { type: "run:done"; siteStats: SiteStats; fixes: FixFinding[] }
   | { type: "run:stopped"; siteStats: SiteStats; fixes: FixFinding[]; reason: string }
-  | { type: "run:error"; message: string };
+  | { type: "run:error"; message: string }
+  | { type: "warn"; scope: "afdocs"; message: string };

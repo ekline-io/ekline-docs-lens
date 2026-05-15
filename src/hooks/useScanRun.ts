@@ -49,6 +49,8 @@ export interface ScanState {
   siteStats?: SiteStats;
   fixes: FixFinding[];
   errorMessage?: string;
+  /** Non-fatal warnings surfaced during the run (e.g. afdocs sub-runner failed). */
+  warnings?: string[];
   /** Reason text for a stopped run, e.g. "stopped after 3 of 250 pages". */
   stoppedReason?: string;
   /** Raw final RunResult once available. */
@@ -217,5 +219,7 @@ function apply(prev: ScanState, e: RunEvent): ScanState {
       };
     case "run:error":
       return { ...prev, status: "error", errorMessage: e.message };
+    case "warn":
+      return { ...prev, warnings: [...(prev.warnings ?? []), e.message] };
   }
 }

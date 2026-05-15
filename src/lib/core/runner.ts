@@ -171,24 +171,31 @@ export class Runner {
       }
     };
 
-    // Run page-level work, our site-level probes, and the afdocs sub-runner
-    // concurrently. Our probes hit different endpoints (sitemap, well-known,
-    // robots) than the page fan-out; afdocs runs its own crawl with its own
-    // rate limiter and doesn't compete with our browser pool.
+    // Three concurrent workloads: our page fan-out, our site-level probes,
+    // and afdocs (which owns its own crawl). They hit different endpoints
+    // and don't compete for the browser pool.
     const [, siteCheckResult, afdocsResult] = await Promise.all([
       Promise.all(
         Array.from({ length: Math.max(1, Math.min(pageConcurrency, total)) }, () => worker()),
       ),
       runSiteChecks(config.rootUrl),
-      runAfdocsChecks(config.rootUrl, { samplingStrategy: "deterministic" }),
+      runAfdocsChecks(config.rootUrl, { pageCap: cap }),
     ]);
+    if (afdocsResult.error) {
+      console.warn(`[docs-lens] afdocs sub-runner failed: ${afdocsResult.error}`);
+      onEvent({
+        type: "warn",
+        scope: "afdocs",
+        message: `afdocs sub-runner failed: ${afdocsResult.error}`,
+      });
+    }
     const { findings: siteCheckFindings, allChecks: rawSiteChecks } = siteCheckResult;
     allFindings.push(...siteCheckFindings);
-    // afdocs is the source of truth for the 23 check IDs it ships. Our
-    // implementations for those IDs (if any leaked through) are suppressed
-    // so the user sees one verdict per ID, sourced from afdocs.
+    // afdocs is canonical for the IDs it ships. The filter is defense-in-
+    // depth — page-checks and adapter.ts shouldn't emit afdocs-owned IDs
+    // post-adoption, but this prevents accidental re-introduction.
     const afdocsIds = new Set(afdocsResult.results.map((r) => r.id));
-    const siteChecks = rawSiteChecks.filter((c) => !afdocsIds.has(c.id));
+    const siteChecks = stripAfdocsIds(rawSiteChecks, afdocsIds);
     for (const c of afdocsResult.results) {
       if (c.severity === "fail" || c.severity === "warn") {
         allFindings.push(checkToFinding(c));
@@ -200,27 +207,22 @@ export class Runner {
      // zero, but emitted pages should be an actual array.
     const finishedPages = pages.filter((p): p is PageResult => !!p);
 
-    // Per-page checks fan out over each page's profile output and roll up
-    // into one CheckResult per id (worst-severity wins). Their findings
-    // join the fix engine alongside the site-level probes; their
-    // CheckResults join the all-checks list. We also stash the raw per-page
-    // results on each PageResult so the drilldown route can render them
-    // without re-running the checks.
+    // Per-page checks: worst-severity rollup per check id. We stash the raw
+    // per-page results on each PageResult so the drilldown route can render
+    // them without re-running.
     const perPageChecks = await Promise.all(
       finishedPages.map((p) => runPageChecks(p)),
     );
     finishedPages.forEach((p, i) => {
       p.pageChecks = perPageChecks[i];
     });
-    // Aggregated per-page checks are also gated by afdocs's IDs — afdocs
-    // owns the canonical verdict for any ID it ships, regardless of whether
-    // ours ran site-wide or per-page.
-    const aggregatedPageChecks = aggregatePageChecks(perPageChecks).filter(
-      (c) => !afdocsIds.has(c.id),
+    const aggregatedPageChecks = stripAfdocsIds(
+      aggregatePageChecks(perPageChecks),
+      afdocsIds,
     );
     for (const c of aggregatedPageChecks) {
       if (c.severity === "fail" || c.severity === "warn") {
-        allFindings.push(pageCheckToFinding(c));
+        allFindings.push(checkToFinding(c));
       }
     }
 
@@ -264,35 +266,22 @@ function newRunId(): string {
   return `run_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/**
- * Convert an aggregated per-page CheckResult into a FixFinding so the fix
- * engine can rank it alongside site-level findings. We pick the first
- * affected URL as the page reference and pull occurrences from
- * details.perSeverity, falling back to 1.
- */
-/**
- * Convert an afdocs-sourced CheckResult into a FixFinding so the fix engine
- * ranks it alongside our own. afdocs results don't carry per-page detail in
- * the shape our pageCheckToFinding expects (it does its own sampling), so
- * we flatten into a single general finding.
- */
-function checkToFinding(c: CheckResult): FixFinding {
-  return {
-    id: `check:${c.id}`,
-    title: c.title || c.id,
-    severity: c.severity === "fail" ? "fail" : c.severity === "warn" ? "warn" : "info",
-    source: "check",
-    evidence: c.message ?? "",
-    affectedProfiles: "general",
-    fixHint: c.fix ?? (c.source ? `See ${c.source}` : "Resolve per AFDocs guidance"),
-    pageUrl: "",
-    occurrences: 1,
-    audit: c.audit,
-    conclusion: c.conclusion,
-  };
+function severityToFix(s: CheckResult["severity"]): FixFinding["severity"] {
+  if (s === "fail") return "fail";
+  if (s === "warn") return "warn";
+  return "info"; // `pass` collapses here too — it shouldn't reach this fn but be safe
 }
 
-function pageCheckToFinding(c: CheckResult): FixFinding {
+function stripAfdocsIds(checks: CheckResult[], afdocsIds: Set<string>): CheckResult[] {
+  return checks.filter((c) => !afdocsIds.has(c.id));
+}
+
+/**
+ * Convert a CheckResult into a FixFinding. Aggregated per-page checks carry
+ * `details.affectedPages` and `details.perSeverity`; site- and afdocs-level
+ * checks don't — they collapse to a single general finding.
+ */
+function checkToFinding(c: CheckResult): FixFinding {
   const affected = (c.details?.affectedPages as string[] | undefined) ?? [];
   const perSeverity = c.details?.perSeverity as
     | Record<CheckResult["severity"], number>
@@ -302,7 +291,7 @@ function pageCheckToFinding(c: CheckResult): FixFinding {
   return {
     id: `check:${c.id}`,
     title: c.title || c.id,
-    severity: c.severity === "fail" ? "fail" : c.severity === "warn" ? "warn" : "info",
+    severity: severityToFix(c.severity),
     source: "check",
     evidence: c.message ?? "",
     affectedProfiles: "general",
