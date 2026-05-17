@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:browser": "vitest run --config vitest.browser.config.ts",
-    "playwright:install": "playwright install chromium"
+    "playwright:install": "playwright install chromium",
+    "audit:afdocs": "node scripts/audit-afdocs-rubric.mjs"
   },
   "dependencies": {
     "@sparticuz/chromium-min": "^147.0.2",
@@ -36,6 +37,7 @@
     "@types/react-dom": "^19",
     "@types/turndown": "^5.0.6",
     "@vitest/coverage-v8": "^4.1.5",
+    "afdocs": "^0.18.7",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "tailwindcss": "^4",

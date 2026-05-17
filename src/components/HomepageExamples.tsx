@@ -20,8 +20,8 @@ interface ExampleSpec {
 }
 
 const EXAMPLES: ExampleSpec[] = [
-  { slug: "stripe_docs", host: "docs.stripe.com", failCount: 5, warnCount: 6, pages: 10 },
-  { slug: "vercel_docs", host: "vercel.com/docs", failCount: 7, warnCount: 4, pages: 10 },
+  { slug: "stripe_docs", host: "docs.stripe.com", failCount: 8, warnCount: 5, pages: 10 },
+  { slug: "vercel_docs", host: "vercel.com/docs", failCount: 8, warnCount: 6, pages: 10 },
   { slug: "ekline_docs", host: "docs.ekline.io", failCount: 4, warnCount: 4, pages: 10 },
 ];
 

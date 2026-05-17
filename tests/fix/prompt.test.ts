@@ -70,7 +70,7 @@ describe("generateAgentFixPrompt", () => {
       grade: "A+",
       findings: [],
     });
-    expect(out).toContain("npx afdocs check https://x.com --fixes --verbose");
+    expect(out).toMatch(/npx afdocs@[\d.]+ check https:\/\/x\.com --fixes --verbose/);
   });
 
   it("dedupes findings by id when generating common fixes", () => {

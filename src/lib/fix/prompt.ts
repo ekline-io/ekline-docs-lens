@@ -1,5 +1,6 @@
 import type { FixFinding } from "./types";
 import { fixCopyFor } from "./check-fix-copy";
+import { AFDOCS_PINNED_VERSION } from "./afdocs-version";
 
 export interface AgentFixPromptInput {
   siteUrl: string;
@@ -62,16 +63,22 @@ export function generateAgentFixPrompt(input: AgentFixPromptInput): string {
     lines.push("");
   }
 
-  lines.push("## Run afdocs Locally for More Detail");
+  lines.push("## Run afdocs locally for an independent read");
   lines.push("");
-  lines.push("To get deeper visibility into what's failing, run afdocs against your docs:");
+  lines.push(
+    "afdocs is the canonical CLI for the Agent-Friendly Documentation Spec. We run a superset of its rubric; running it locally gives you a second pair of eyes on the same site:",
+  );
   lines.push("");
   lines.push("```");
-  lines.push(`  npx afdocs check ${input.siteUrl} --fixes --verbose`);
+  lines.push(`  npx afdocs@${AFDOCS_PINNED_VERSION} check ${input.siteUrl} --fixes --verbose`);
   lines.push("```");
   lines.push("");
-  lines.push("- **--fixes**: Adds 'Fix:' lines to the output for each warn/fail check with actionable remediation steps");
+  lines.push("- **--fixes**: Adds 'Fix:' lines to the output for each warn/fail check");
   lines.push("- **-v, --verbose**: Shows per-page details (specific URLs, character counts, error codes)");
+  lines.push("");
+  lines.push(
+    "Docs Lens calls `afdocs.runChecks()` for the 23 AFDocs Spec checks (same verdict you'd get from the CLI) and adds 16 Docs Lens-specific checks on top: well-known endpoints, OAuth discovery, sitemap, AI bot rules, image alt coverage, structured data, internal-link integrity, heading hierarchy.",
+  );
 
   return lines.join("\n");
 }

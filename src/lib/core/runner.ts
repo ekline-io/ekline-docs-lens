@@ -15,6 +15,7 @@ import { computeSiteStats } from "@/lib/diff/site-stats";
 import { mergeAndRank } from "@/lib/fix/engine";
 import { runSiteChecks, aggregatePageChecks } from "@/lib/checks/adapter";
 import { runPageChecks } from "@/lib/checks/page-checks";
+import { runAfdocsChecks } from "@/lib/afdocs/runner";
 import type { FixFinding } from "@/lib/fix/types";
 import type { CheckResult } from "@/lib/types";
 
@@ -170,39 +171,58 @@ export class Runner {
       }
     };
 
-    // Run page-level work and the site-level AFDocs probes concurrently —
-    // the probes hit different endpoints (sitemap, /.well-known/*, robots)
-    // and don't compete with the main fan-out for the browser pool.
-    const [, siteCheckResult] = await Promise.all([
+    // Three concurrent workloads: our page fan-out, our site-level probes,
+    // and afdocs (which owns its own crawl). They hit different endpoints
+    // and don't compete for the browser pool.
+    const [, siteCheckResult, afdocsResult] = await Promise.all([
       Promise.all(
         Array.from({ length: Math.max(1, Math.min(pageConcurrency, total)) }, () => worker()),
       ),
       runSiteChecks(config.rootUrl),
+      runAfdocsChecks(config.rootUrl, { pageCap: cap }),
     ]);
-    const { findings: siteCheckFindings, allChecks: siteChecks } = siteCheckResult;
+    if (afdocsResult.error) {
+      console.warn(`[docs-lens] afdocs sub-runner failed: ${afdocsResult.error}`);
+      onEvent({
+        type: "warn",
+        scope: "afdocs",
+        message: `afdocs sub-runner failed: ${afdocsResult.error}`,
+      });
+    }
+    const { findings: siteCheckFindings, allChecks: rawSiteChecks } = siteCheckResult;
     allFindings.push(...siteCheckFindings);
+    // afdocs is canonical for the IDs it ships. The filter is defense-in-
+    // depth — page-checks and adapter.ts shouldn't emit afdocs-owned IDs
+    // post-adoption, but this prevents accidental re-introduction.
+    const afdocsIds = new Set(afdocsResult.results.map((r) => r.id));
+    const siteChecks = stripAfdocsIds(rawSiteChecks, afdocsIds);
+    for (const c of afdocsResult.results) {
+      if (c.severity === "fail" || c.severity === "warn") {
+        allFindings.push(checkToFinding(c));
+      }
+    }
 
     // Drop holes left by stopped workers (when stop arrives mid-fan-out the
      // pages array is sparse). The site-stats layer treats undefined pages as
      // zero, but emitted pages should be an actual array.
     const finishedPages = pages.filter((p): p is PageResult => !!p);
 
-    // Per-page checks fan out over each page's profile output and roll up
-    // into one CheckResult per id (worst-severity wins). Their findings
-    // join the fix engine alongside the site-level probes; their
-    // CheckResults join the all-checks list. We also stash the raw per-page
-    // results on each PageResult so the drilldown route can render them
-    // without re-running the checks.
+    // Per-page checks: worst-severity rollup per check id. We stash the raw
+    // per-page results on each PageResult so the drilldown route can render
+    // them without re-running.
     const perPageChecks = await Promise.all(
       finishedPages.map((p) => runPageChecks(p)),
     );
     finishedPages.forEach((p, i) => {
       p.pageChecks = perPageChecks[i];
     });
-    const aggregatedPageChecks = aggregatePageChecks(perPageChecks);
+    const aggregatedPageChecks = stripAfdocsIds(
+      aggregatePageChecks(perPageChecks),
+      afdocsIds,
+    );
     for (const c of aggregatedPageChecks) {
       if (c.severity === "fail" || c.severity === "warn") {
-        allFindings.push(pageCheckToFinding(c));
+        allFindings.push(checkToFinding(c));
       }
     }
 
@@ -232,7 +252,7 @@ export class Runner {
       pages: finishedPages,
       siteStats,
       fixes,
-      siteChecks: [...siteChecks, ...aggregatedPageChecks],
+      siteChecks: [...siteChecks, ...aggregatedPageChecks, ...afdocsResult.results],
     };
     return result;
   }
@@ -246,13 +266,22 @@ function newRunId(): string {
   return `run_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function severityToFix(s: CheckResult["severity"]): FixFinding["severity"] {
+  if (s === "fail") return "fail";
+  if (s === "warn") return "warn";
+  return "info"; // `pass` collapses here too — it shouldn't reach this fn but be safe
+}
+
+function stripAfdocsIds(checks: CheckResult[], afdocsIds: Set<string>): CheckResult[] {
+  return checks.filter((c) => !afdocsIds.has(c.id));
+}
+
 /**
- * Convert an aggregated per-page CheckResult into a FixFinding so the fix
- * engine can rank it alongside site-level findings. We pick the first
- * affected URL as the page reference and pull occurrences from
- * details.perSeverity, falling back to 1.
+ * Convert a CheckResult into a FixFinding. Aggregated per-page checks carry
+ * `details.affectedPages` and `details.perSeverity`; site- and afdocs-level
+ * checks don't — they collapse to a single general finding.
  */
-function pageCheckToFinding(c: CheckResult): FixFinding {
+function checkToFinding(c: CheckResult): FixFinding {
   const affected = (c.details?.affectedPages as string[] | undefined) ?? [];
   const perSeverity = c.details?.perSeverity as
     | Record<CheckResult["severity"], number>
@@ -262,7 +291,7 @@ function pageCheckToFinding(c: CheckResult): FixFinding {
   return {
     id: `check:${c.id}`,
     title: c.title || c.id,
-    severity: c.severity === "fail" ? "fail" : c.severity === "warn" ? "warn" : "info",
+    severity: severityToFix(c.severity),
     source: "check",
     evidence: c.message ?? "",
     affectedProfiles: "general",

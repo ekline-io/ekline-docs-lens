@@ -37,12 +37,19 @@ const COPY: Record<string, FixCopy> = {
     long:
       "Tighter agent fetchers (MCP defaults to 5 KB, Cursor WebFetch to 28 KB, Claude Code truncates at 100 KB) only see the opening of an oversized llms.txt. Use the progressive-disclosure pattern: a small root file pointing to /docs/section/llms.txt files.",
   },
-  "llms-txt-directive": {
-    title: "llms.txt discovery directive",
+  "llms-txt-directive-html": {
+    title: "llms.txt directive on HTML pages",
     short:
-      "Add an llms.txt directive (link or HTTP header) so agents can find it without guessing the path.",
+      'Add `<link rel="llms.txt" href="/llms.txt">` to every HTML page\'s <head>.',
     long:
-      "Even if /llms.txt exists, agents only know to look for it if your homepage points to it (`<link rel=\"llms.txt\" href=\"/llms.txt\">` or an HTTP `Link` header).",
+      "Even if /llms.txt exists, agents only know to look for it if your HTML pages point to it via a <link> tag. afdocs samples HTML pages and checks for the directive there.",
+  },
+  "llms-txt-directive-md": {
+    title: "llms.txt directive on markdown pages",
+    short:
+      'Send `Link: </llms.txt>; rel="llms.txt"` headers on markdown responses.',
+    long:
+      "Markdown responses (when content-negotiated as text/markdown) can't carry a <link> tag — they need the directive in the HTTP Link header instead. afdocs verifies the header on sampled markdown URLs.",
   },
   "llms-txt-links-resolve": {
     title: "llms.txt link integrity",
@@ -255,7 +262,7 @@ const COPY: Record<string, FixCopy> = {
     short: "Add explicit User-agent stanzas in /robots.txt for GPTBot, ClaudeBot, PerplexityBot, OAI-SearchBot, and Google-Extended.",
     long: "Without explicit User-agent rules, AI crawlers fall back to platform defaults that vary widely and may not match your intent. Naming each crawler explicitly puts you in control of who can crawl, who can train, and who can answer-engine-cite.",
   },
-  "cache-headers": {
+  "cache-header-hygiene": {
     title: "Cache validators (Last-Modified / ETag)",
     short: "Send Last-Modified or ETag headers on docs responses.",
     long: "Cache validators let agents skip the body when nothing changed (304 Not Modified). Without them, every fetch refetches the full response, which is wasteful for the agent's budget and your bandwidth.",
@@ -269,6 +276,27 @@ const COPY: Record<string, FixCopy> = {
     title: "A2A agent card",
     short: "If your product itself acts as an agent, publish /.well-known/agent-card.json.",
     long: "Agent-to-Agent (A2A) discovery lets other agents find your service as a callable agent and learn its capabilities programmatically. Optional unless your product surfaces agent-like functionality.",
+  },
+  "llms-txt-coverage": {
+    title: "llms.txt coverage of sitemap",
+    short:
+      "Ensure /llms.txt lists at least 95% of the URLs in /sitemap.xml (or your docs subset).",
+    long:
+      "afdocs compares the URLs in your llms.txt against your sitemap and measures coverage. If the manifest only lists a fraction of your pages, agents using it as a shortcut miss the rest. Pass: ≥95%; warn: ≥80%; fail otherwise.",
+  },
+  "markdown-content-parity": {
+    title: "Markdown content parity with HTML",
+    short:
+      "Make sure the .md version of each page contains the same substantive content as the .html version.",
+    long:
+      "When you offer both .html and .md variants, drift between them silently lies to agents. afdocs compares segment-by-segment and flags pages where the markdown is missing >5% of the HTML content (warn at >20%).",
+  },
+  "section-header-quality": {
+    title: "Tab-variant headings include context",
+    short:
+      "When a section has tabs (Python / JS / curl), repeat the variant name in the header so each tab's section is self-describing.",
+    long:
+      "Agents reading a single tab in isolation need to know which variant it represents. A header like `Authenticate` on the Python tab and another `Authenticate` on the curl tab are indistinguishable when chunked. afdocs flags headers that lose their variant context.",
   },
 };
 

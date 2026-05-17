@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AFDOCS_PINNED_VERSION } from "@/lib/fix/afdocs-version";
 
 interface Props {
   prompt: string;
@@ -36,7 +37,7 @@ export function AgentFixPrompt({ prompt, failCount = 0, warnCount = 0 }: Props) 
             </h3>
             <p className="text-[13px] text-ink/65 mt-2 max-w-2xl">
               Paste into Claude Code, Cursor, or any coding agent. The prompt names every failing
-              check, explains the fix, and points the agent at <code className="mono px-1 py-px rounded bg-paper-dim text-ink/85 text-[11.5px]">npx afdocs check</code> for deeper detail.
+              check, explains the fix, and points the agent at <code className="mono px-1 py-px rounded bg-paper-dim text-ink/85 text-[11.5px]">{`npx afdocs@${AFDOCS_PINNED_VERSION} check`}</code> for an independent read against the AFDocs Spec.
             </p>
           </div>
           <button

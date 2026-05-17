@@ -61,8 +61,8 @@ const VS: Array<{ tool: string; angle: string; we: string }> = [
   },
   {
     tool: "afdocs (npx afdocs check)",
-    angle: "Open-source CLI by the AFDocs spec authors. Comprehensive. Best for CI integration.",
-    we: "We complement it. Our agent-fix prompt explicitly points users at npx afdocs check --fixes --verbose for deeper local detail. We're the visual-first companion.",
+    angle: "Open-source CLI for the AFDocs Spec. Canonical rubric.",
+    we: "We adopt it. The 23 AFDocs Spec checks come straight from `afdocs.runChecks()` — same verdict the visitor gets running the CLI locally. On top, Docs Lens runs 16 checks that go beyond the Spec: well-known endpoints, OAuth discovery, sitemap, AI bot rules, internal-link integrity, structured data, image alt coverage, heading hierarchy. 39 checks total, two implementations, one source of truth per check.",
   },
 ];
 

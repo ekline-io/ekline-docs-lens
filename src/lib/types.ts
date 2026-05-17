@@ -57,8 +57,12 @@ export const AXIS_OF: Record<string, Axis> = {
   "llms-txt-size": "agent",
   "llms-txt-links-resolve": "agent",
   "llms-txt-links-markdown": "agent",
-  "llms-txt-directive": "agent",
+  "llms-txt-directive-html": "agent",
+  "llms-txt-directive-md": "agent",
   "llms-txt-freshness": "agent",
+  "llms-txt-coverage": "agent",
+  "markdown-content-parity": "agent",
+  "section-header-quality": "agent",
   "markdown-url-support": "agent",
   "content-negotiation": "agent",
   "rendering-strategy": "agent",
@@ -71,7 +75,7 @@ export const AXIS_OF: Record<string, Axis> = {
   "oauth-discovery": "agent",
   "oauth-protected-resource": "agent",
   "link-headers": "agent",
-  "cache-headers": "agent",
+  "cache-header-hygiene": "agent",
   "a2a-agent-card": "agent",
 
   // GEO, can answer engines find and cite you?
